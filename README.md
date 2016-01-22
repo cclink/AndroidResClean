@@ -13,11 +13,11 @@ This AndroidResClean tool can finish this work in a few seconds. It can find var
 6. All operations are logged into AndroidResClean.log. You can retrieve this file for more information. Especially, when you don't want AndroidResClean to remove useless resources automatically, by unset 'RemoveUnused' option, you should view this file to get the useless resources lists.
 
 ## Usage
-1. The script run with python 2.7 environment. Get python if you don't have. https://www.python.org/downloads/
+1. AndroidResClean run with python 2.7 environment. Get python if you don't have. https://www.python.org/downloads/
 2. Set the options in config.ini.
 3. Run AndroidResClean with 'python AndroidResClean.py' in the command line. 
 
 ## Attentions
 1. These resource types are unsupported: stylable attr id   transition menu xml raw
-2. The AndroidResClean cannot be applied to complied project. It cannot decompile jars, at present.
+2. AndroidResClean cannot be applied to complied project. It cannot decompile jars, at present.
  

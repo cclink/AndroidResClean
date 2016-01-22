@@ -488,10 +488,18 @@ def process(logContent):
         return
     # 获取配置文件中配置的工程目录
     projectDir = configParser.get('Dir', 'ProjectDir')
+    isRemove = configParser.get('AndroidClean', 'RemoveUnused')
+    isBackup = configParser.get('AndroidClean', 'Backup')
+    if isRemove.lower() == 'true':
+        isRemove = True
+    else:
+        isRemove = False
+    if isBackup.lower() == 'true':
+        isBackup = True
+    else:
+        isBackup = False
 
     # 没有相应配置，返回
-    if projectDir == None:
-        raise RuntimeError,'Unknown parameters'
     if not os.path.exists(projectDir):
         raise RuntimeError,'Invalid parameters'
     # 判断工程是Eclipse还是Android Studio
@@ -540,22 +548,20 @@ def process(logContent):
     addUnsedToLog(unusedNotValuesDict, logContent)
     
     # 判断是否要删除不用的资源
-    if configParser.has_option('AndroidClean', 'RemoveUnused'):
-        isRemove = configParser.get('AndroidClean', 'RemoveUnused')
-        if isRemove.lower() == 'true':
-            tempDict = {}
-            for (unusedType, unusedList) in unusedInValuesDict.items():
-                if len(unusedList) != 0:
-                    tempDict[unusedType] = unusedList
-            if len(tempDict) != 0:
-                removeUnused(resPath, unusedInValuesDict, logContent)
-                
-            tempDict.clear()
-            for (unusedType, unusedList) in unusedNotValuesDict.items():
-                if len(unusedList) != 0:
-                    tempDict[unusedType] = unusedList
-            if len(tempDict) != 0:
-                removeUnusedNotInValues(resPath, unusedNotValuesDict, logContent)
+    if isRemove:
+        tempDict = {}
+        for (unusedType, unusedList) in unusedInValuesDict.items():
+            if len(unusedList) != 0:
+                tempDict[unusedType] = unusedList
+        if len(tempDict) != 0:
+            removeUnused(resPath, unusedInValuesDict, logContent)
+
+        tempDict.clear()
+        for (unusedType, unusedList) in unusedNotValuesDict.items():
+            if len(unusedList) != 0:
+                tempDict[unusedType] = unusedList
+        if len(tempDict) != 0:
+            removeUnusedNotInValues(resPath, unusedNotValuesDict, logContent)
 
 def saveToLog(logContent):
     logFile = 'AndroidResClean.log'
