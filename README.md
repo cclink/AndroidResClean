@@ -17,7 +17,7 @@ This AndroidResClean tool can finish this work in a few seconds. It can find var
 2. Set the options in config.ini.
 3. Run AndroidResClean with 'python AndroidResClean.py' in the command line. 
 
-## Attention
+## Attentions
 1. These resource types are unsupported: stylable attr id   transition menu xml raw
 2. The AndroidResClean cannot be applied to complied project. It cannot decompile jars, at present.
  
