@@ -197,7 +197,7 @@ def getSrcPathList(isEclipse, projectDir):
 
 
 # Get all configured resources in resources folder
-def getResConfiguredInValues(resPathList, resTypes):
+def getConfiguredValueRes(resPathList, resTypes):
     resDic = {resType: [] for resType in resTypes}
     for resPath in resPathList:
         # Iterate through all the files in resources folder.
@@ -229,7 +229,7 @@ def getResConfiguredInValues(resPathList, resTypes):
     return resDic
 
 
-def getResConfigedInFiles(resPathList, resTypes):
+def getConfiguredFileRes(resPathList, resTypes):
     resDic = {resType: [] for resType in resTypes}
     for resType in resTypes:
         resFolders = []
@@ -324,7 +324,7 @@ def getReadableTime():
     return readableTime
 
 
-def removeUnused(resPathList, unusedDict):
+def removeUnusedValueRes(resPathList, unusedDict):
     # Iterate through all resource folders
     for resPath in resPathList:
         for (parent, _, fileNames) in os.walk(resPath):
@@ -383,7 +383,7 @@ def removeUnused(resPathList, unusedDict):
                     logContent.append(fileFullPath[len(resPath)+1:] + ' is empty and has been removed')
 
 
-def removeUnusedNotInValues(resPathList, unusedDict):
+def removeUnusedFileRes(resPathList, unusedDict):
     for (unusedType, unusedList) in unusedDict.items():
         typedFolders = []
         for resPath in resPathList:
@@ -590,44 +590,47 @@ def process():
         logContent.append('src dir: ' + srcPath)
     
     # get configed resource
-    resConfigedInValues = getResConfiguredInValues(resPathList, ('dimen', 'string', 'color', 'style', 'array', 'string-array', 'integer-array'))
-    resConfigedNotValues = getResConfigedInFiles(resPathList, ('drawable', 'layout', 'anim', 'animator'))
+    valueTypes = ('dimen', 'string', 'color', 'style', 'array', 'bool', 'integer', 'string-array', 'integer-array')
+    fileTypes = ('drawable', 'layout', 'anim', 'animator')
+    configuredValueRes = getConfiguredValueRes(resPathList, valueTypes)
+    configuredFileRes = getConfiguredFileRes(resPathList, fileTypes)
     
     # merge integer-array list and string-array list with array list
-    resConfigedInValues['array'] = resConfigedInValues['array'] + resConfigedInValues['string-array'] + resConfigedInValues['integer-array'] 
-    del resConfigedInValues['string-array']
-    del resConfigedInValues['integer-array']
+    configuredValueRes['array'] = configuredValueRes['array'] + configuredValueRes['string-array'] + configuredValueRes['integer-array']
+    del configuredValueRes['string-array']
+    del configuredValueRes['integer-array']
     
     # get use resource
-    resUsedDict = getUsedRes(resPathList, srcPathList, ('dimen', 'string', 'color', 'style', 'array', 'drawable', 'layout', 'anim', 'animator'))
+    allTypes = tuple(set(valueTypes + fileTypes) - set(('string-array', 'integer-array')))
+    usedResDict = getUsedRes(resPathList, srcPathList, allTypes)
 
     # get unused resources
-    unusedInValuesDict = {}
-    for (resType, typeList) in resConfigedInValues.items():
-        unusedInValuesDict[resType] = list(set(typeList) - set(resUsedDict[resType]))
-    unusedNotValuesDict = {}
-    for (resType, typeList) in resConfigedNotValues.items():
-        unusedNotValuesDict[resType] = list(set(typeList) - set(resUsedDict[resType]))
+    unusedValueResDict = {}
+    for (resType, typeList) in configuredValueRes.items():
+        unusedValueResDict[resType] = list(set(typeList) - set(usedResDict[resType]))
+    unusedFileResDict = {}
+    for (resType, typeList) in configuredFileRes.items():
+        unusedFileResDict[resType] = list(set(typeList) - set(usedResDict[resType]))
     
     # append the unused resources to log
-    addUnsedToLog(unusedInValuesDict)
-    addUnsedToLog(unusedNotValuesDict)
+    addUnsedToLog(unusedValueResDict)
+    addUnsedToLog(unusedFileResDict)
     
     # remove unused resources in the project
     if isRemove:
         tempDict = {}
-        for (unusedType, unusedList) in unusedInValuesDict.items():
+        for (unusedType, unusedList) in unusedValueResDict.items():
             if len(unusedList) != 0:
                 tempDict[unusedType] = unusedList
         if len(tempDict) != 0:
-            removeUnused(resPathList, unusedInValuesDict)
+            removeUnusedValueRes(resPathList, unusedValueResDict)
 
         tempDict.clear()
-        for (unusedType, unusedList) in unusedNotValuesDict.items():
+        for (unusedType, unusedList) in unusedFileResDict.items():
             if len(unusedList) != 0:
                 tempDict[unusedType] = unusedList
         if len(tempDict) != 0:
-            removeUnusedNotInValues(resPathList, unusedNotValuesDict)
+            removeUnusedFileRes(resPathList, unusedFileResDict)
 
 
 def saveToLog():
