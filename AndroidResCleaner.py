@@ -635,7 +635,7 @@ def process():
 
 
 def saveToLog():
-    logFile = 'AndroidResClean.log'
+    logFile = 'AndroidResCleaner.log'
     # log file exists and not empty, open file with append mode
     if os.path.exists(logFile) and os.path.getsize(logFile) != 0:
         logFp = open(logFile, 'a+')
