@@ -216,7 +216,7 @@ def getResConfiguredInValues(resPathList, resTypes):
                     items = root.getElementsByTagName(resType)
                     for item in items:
                         itemName = item.getAttribute('name')
-                        if itemName is None and itemName != '':
+                        if itemName is not None and itemName != '':
                             resTypedList.append(itemName)
                     #  Find the item nodes in the file.
                     itemItems = root.getElementsByTagName('item')
