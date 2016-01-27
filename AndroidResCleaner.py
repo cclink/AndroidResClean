@@ -469,8 +469,10 @@ def replaceNewline(srcFile, destFile):
                 # If the lines are not equal, check whether the dest line is empty,
                 # if so, this is an empty line in dest file, caused by removeChild
                 if destLine != "":
-                    # 分别获取两个文件此行中的name字段，并判断name是否相等，如果name相等，则表示此行仍然是相等的
-                    # minidom有一个bug，如果一个item有多个参数，保存的时候会自动按照字典顺序来保存，这样就和原先行不一样了
+                    # get the names from the line at both files, then check whether the names are equal
+                    # If names equal, the lines are the same.
+                    # Because minidom has a bug, if an item has more than one properties,
+                    # the sequence of properties would rearranged when saving
                     regex = re.compile('\s+name\s*=\s*"(\w+)"')
                     srcSearch = regex.search(srcLine)
                     destSearch = regex.search(destLine)
