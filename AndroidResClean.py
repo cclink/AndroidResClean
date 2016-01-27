@@ -171,7 +171,8 @@ def getSrcPathList(isEclipse, projectDir):
                         stripLine = stripLine[pos + len('java.srcDirs'):].lstrip()
                         assert len(stripLine) > 2
                         if stripLine[0:2] == '+=':
-                            srcPath.append(os.path.join(projectDir, 'src' + os.path.sep + 'main' + os.path.sep + 'java'))
+                            temp = os.path.join(projectDir, 'src' + os.path.sep + 'main' + os.path.sep + 'java')
+                            srcPath.append(temp)
                             stripLine = stripLine[2:]
                         stripLine = stripLine.lstrip(' [=').rstrip(']')
                         splitLine = stripLine.split(',')
@@ -282,7 +283,7 @@ def getUsedRes(resPathList, srcPathList, resTypes):
                             resUsedList.append(findItem[1])
                         if findItem[3] != '':
                             resUsedList.append(findItem[3])
-                    
+
     # Iterate through all source code folders
     for srcPath in srcPathList:
         for (parent, _, fileNames) in os.walk(srcPath):
@@ -427,12 +428,12 @@ def replaceNewline(srcFile, destFile):
         srcLines = srcfp.readlines()
         srcNewl = srcfp.newlines
         srcfp.close()
-        
+
         destfp = open(destFile, 'rU')
         destLines = destfp.readlines()
         destNewl = destfp.newlines
         destfp.close()
-        # split the first line at ?> to two lines，or remove the encoding part if the original file have no encoding part
+        # split the first line at ?> to two lines，or remove the encoding part if the original file haven't this
         if len(destLines) != 0:
             line0 = destLines[0]
             index = line0.find('?>')
@@ -491,7 +492,7 @@ def replaceNewline(srcFile, destFile):
                     raise RuntimeError('this should not be happened')
                 if endEmptyLine == destLineCount - 1 and destLines[endEmptyLine].strip() == "":
                     raise RuntimeError('this should not be happened')
-                
+
                 # get the line number in original file that equals the line in the next not empty line of dest file
                 thisDestLine = destLines[endEmptyLine]
                 for nextEqualLine in range(srcIndex, srcLineCount):
@@ -513,19 +514,19 @@ def replaceNewline(srcFile, destFile):
                 # record the line that should be removed
                 for tempLineNum in range(destIndex, endEmptyLine - srcEmptyCount):
                     removedLines.append(tempLineNum)
-                
+
                 destIndex = endEmptyLine
                 srcIndex = nextEqualLine
         else:
             raise RuntimeError('destination file have more lines than the original file')
-            
+
         for lineNum in removedLines[::-1]:
             del destLines[lineNum]
-            
+
         if srcNewl is not None and destNewl is not None and srcNewl != destNewl:
             for lineStr in destLines:
                 lineStr = lineStr.rstrip(destNewl) + srcNewl
-                
+
         destfp = open(destFile, 'w')
         destfp.writelines(destLines)
         destfp.close()
@@ -588,20 +589,20 @@ def process():
         logContent.append('res dir: ' + resPath)
     for srcPath in srcPathList:
         logContent.append('src dir: ' + srcPath)
-    
+
     # get configed resource
     valueTypes = ('dimen', 'string', 'color', 'style', 'array', 'bool', 'integer', 'string-array', 'integer-array')
     fileTypes = ('drawable', 'layout', 'anim', 'animator')
     configuredValueRes = getConfiguredValueRes(resPathList, valueTypes)
     configuredFileRes = getConfiguredFileRes(resPathList, fileTypes)
-    
+
     # merge integer-array list and string-array list with array list
     configuredValueRes['array'] = configuredValueRes['array'] + configuredValueRes['string-array'] + configuredValueRes['integer-array']
     del configuredValueRes['string-array']
     del configuredValueRes['integer-array']
-    
+
     # get use resource
-    allTypes = tuple(set(valueTypes + fileTypes) - set(('string-array', 'integer-array')))
+    allTypes = tuple(set(valueTypes + fileTypes) - {'string-array', 'integer-array'})
     usedResDict = getUsedRes(resPathList, srcPathList, allTypes)
 
     # get unused resources
@@ -611,11 +612,11 @@ def process():
     unusedFileResDict = {}
     for (resType, typeList) in configuredFileRes.items():
         unusedFileResDict[resType] = list(set(typeList) - set(usedResDict[resType]))
-    
+
     # append the unused resources to log
     addUnsedToLog(unusedValueResDict)
     addUnsedToLog(unusedFileResDict)
-    
+
     # remove unused resources in the project
     if isRemove:
         tempDict = {}
@@ -645,7 +646,7 @@ def saveToLog():
         logFp = open(logFile, 'w+')
         logFp.writelines([i + '\n' for i in logContent])
     logFp.close()
-    
+
 if __name__ == '__main__':
     logContent = []
     try:
