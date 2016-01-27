@@ -90,13 +90,50 @@ def isAndroidStudioProject(projectDir):
 
 
 # Get the resource folder path
-def getResPath(isEclipse, projectDir):
+def getResPathList(isEclipse, projectDir):
+    resPath = []
     if isEclipse:
-        path = os.path.join(projectDir, 'res')
-        return path
+        resPath.append(os.path.join(projectDir, 'res'))
+        return resPath
     else:
-        path = os.path.join(projectDir, 'src' + os.path.sep + 'main' + os.path.sep + 'res')
-        return path
+        cfgFile = os.path.join(projectDir, 'build.gradle')
+        if os.path.exists(cfgFile):
+            cfgFp = open(cfgFile, 'r')
+            inSourceSetsCfg = False
+            braceCount = 0
+            for cfgLine in cfgFp:
+                stripLine = cfgLine.strip()
+                if stripLine.startswith('sourceSets'):
+                    inSourceSetsCfg = True
+                if inSourceSetsCfg:
+                    pos = stripLine.find('resources.srcDirs')
+                    if pos != -1:
+                        stripLine = stripLine[pos + len('resources.srcDirs'):].lstrip()
+                        assert len(stripLine) > 2
+                        if stripLine[0:2] == '+=':
+                            resPath.append(os.path.join(projectDir, 'src' + os.path.sep + 'main' + os.path.sep + 'res'))
+                            stripLine = stripLine[2:]
+                        stripLine = stripLine.lstrip(' [=').rstrip(']')
+                        splitLine = stripLine.split(',')
+                        for splitItem in splitLine:
+                            splitItem = splitItem.strip(' \'"')
+                            if len(splitItem) != 0:
+                                if os.path.sep != '/':
+                                    splitItem = splitItem.replace('/', os.path.sep)
+                                elif os.path.sep != '\\':
+                                    splitItem = splitItem.replace('\\', os.path.sep)
+                                resPath.append(os.path.join(projectDir, splitItem))
+                        break
+                    braceCount += stripLine.count('{')
+                    braceCount -= stripLine.count('}')
+                    if braceCount <= 0:
+                        break
+            if len(resPath) == 0:
+                resPath.append(os.path.join(projectDir, 'src' + os.path.sep + 'main' + os.path.sep + 'res'))
+            return resPath
+        else:
+            resPath.append(os.path.join(projectDir, 'src' + os.path.sep + 'main' + os.path.sep + 'res'))
+            return resPath
 
 
 # Get the source code folder path
@@ -160,50 +197,52 @@ def getSrcPathList(isEclipse, projectDir):
 
 
 # Get all configured resources in resources folder
-def getResConfiguredInValues(resPath, resTypes):
+def getResConfiguredInValues(resPathList, resTypes):
     resDic = {resType: [] for resType in resTypes}
-    # Iterate through all the files in resources folder.
-    for (parent, _, fileNames) in os.walk(resPath):
-        for fileName in fileNames:
-            # If the file is not an xml file
-            if not fileName.endswith('.xml'):
-                continue
-            # Parse the xml
-            fileFullPath = os.path.join(parent, fileName)
-            dom = xml.dom.minidom.parse(fileFullPath)
-            root = dom.documentElement
-            # Iterate through all resource types. Find the type nodes in the file.
-            for resType in resTypes:
-                resTypedList = resDic[resType]
-                items = root.getElementsByTagName(resType)
-                for item in items:
-                    itemName = item.getAttribute('name')
-                    if itemName is None and itemName != '':
-                        resTypedList.append(itemName)
-                #  Find the item nodes in the file.
-                itemItems = root.getElementsByTagName('item')
-                for item in itemItems:
-                    # record the name if the type equals with the resource type
-                    if item.getAttribute('type') == resType:
+    for resPath in resPathList:
+        # Iterate through all the files in resources folder.
+        for (parent, _, fileNames) in os.walk(resPath):
+            for fileName in fileNames:
+                # If the file is not an xml file
+                if not fileName.endswith('.xml'):
+                    continue
+                # Parse the xml
+                fileFullPath = os.path.join(parent, fileName)
+                dom = xml.dom.minidom.parse(fileFullPath)
+                root = dom.documentElement
+                # Iterate through all resource types. Find the type nodes in the file.
+                for resType in resTypes:
+                    resTypedList = resDic[resType]
+                    items = root.getElementsByTagName(resType)
+                    for item in items:
                         itemName = item.getAttribute('name')
-                        if itemName is not None and itemName != '':
+                        if itemName is None and itemName != '':
                             resTypedList.append(itemName)
+                    #  Find the item nodes in the file.
+                    itemItems = root.getElementsByTagName('item')
+                    for item in itemItems:
+                        # record the name if the type equals with the resource type
+                        if item.getAttribute('type') == resType:
+                            itemName = item.getAttribute('name')
+                            if itemName is not None and itemName != '':
+                                resTypedList.append(itemName)
     return resDic
 
 
-def getResConfigedInFiles(resPath, resTypes):
+def getResConfigedInFiles(resPathList, resTypes):
     resDic = {resType: [] for resType in resTypes}
     for resType in resTypes:
         resFolders = []
-        (_, folders, _) = os.walk(resPath).next()
-        for folder in folders:
-            if folder == resType or folder.startswith(resType + '-'):
-                resFolders.append(folder)
+        for resPath in resPathList:
+            (_, folders, _) = os.walk(resPath).next()
+            for folder in folders:
+                if folder == resType or folder.startswith(resType + '-'):
+                    resFolders.append(os.path.join(resPath, folder))
         # Iterate through all folders
         resNameList = resDic[resType]
         for folder in resFolders:
             # Iterate through all files in the folder
-            (_, _, fileNames) = os.walk(os.path.join(resPath, folder)).next()
+            (_, _, fileNames) = os.walk(folder).next()
             for fileName in fileNames:
                 # Check whether the file name is valid
                 if resType == 'drawable':
@@ -220,28 +259,29 @@ def getResConfigedInFiles(resPath, resTypes):
     return resDic
 
 
-def getUsedRes(resPath, srcPathList, resTypes):
+def getUsedRes(resPathList, srcPathList, resTypes):
     resDic = {resType: [] for resType in resTypes}
     # Iterate through all resource folders
-    for (parent, _, fileNames) in os.walk(resPath):
-        for fileName in fileNames:
-            # Ignore non xml file
-            if not fileName.endswith('.xml'):
-                continue
-            # Parser xml file
-            fileFullPath = os.path.join(parent, fileName)
-            fp = open(fileFullPath, 'r')
-            fileContent = fp.read()
-            fp.close()
-            for resType in resTypes:
-                resUsedList = resDic[resType]
-                regex = re.compile(r'"@([\w.]+:)?%s/(\S+)"|>@([\w.]+:)?%s/(\S+)<' % (resType, resType))
-                findResults = regex.findall(fileContent)
-                for findItem in findResults:
-                    if findItem[1] != '':
-                        resUsedList.append(findItem[1])
-                    if findItem[3] != '':
-                        resUsedList.append(findItem[3])
+    for resPath in resPathList:
+        for (parent, _, fileNames) in os.walk(resPath):
+            for fileName in fileNames:
+                # Ignore non xml file
+                if not fileName.endswith('.xml'):
+                    continue
+                # Parser xml file
+                fileFullPath = os.path.join(parent, fileName)
+                fp = open(fileFullPath, 'r')
+                fileContent = fp.read()
+                fp.close()
+                for resType in resTypes:
+                    resUsedList = resDic[resType]
+                    regex = re.compile(r'"@([\w.]+:)?%s/(\S+)"|>@([\w.]+:)?%s/(\S+)<' % (resType, resType))
+                    findResults = regex.findall(fileContent)
+                    for findItem in findResults:
+                        if findItem[1] != '':
+                            resUsedList.append(findItem[1])
+                        if findItem[3] != '':
+                            resUsedList.append(findItem[3])
                     
     # Iterate through all source code folders
     for srcPath in srcPathList:
@@ -284,34 +324,23 @@ def getReadableTime():
     return readableTime
 
 
-def removeUnused(resPath, unusedDict):
+def removeUnused(resPathList, unusedDict):
     # Iterate through all resource folders
-    for (parent, _, fileNames) in os.walk(resPath):
-        for fileName in fileNames:
-            # Ignore non xml file
-            if not fileName.endswith('.xml'):
-                continue
-            isChanged = False
-            # Parser xml file
-            fileFullPath = os.path.join(parent, fileName)
-            dom = xml.dom.minidom.parse(fileFullPath)
-            root = dom.documentElement
-            for (unusedType, unusedList) in unusedDict.items():
-                # Find all nodes in xml with specific types
-                dimenItems = root.getElementsByTagName(unusedType)
-                for item in dimenItems:
-                    itemName = item.getAttribute('name')
-                    if itemName is not None and itemName in unusedList:
-                        root.removeChild(item)
-                        if not isChanged:
-                            logContent.append('processing file ' + fileFullPath[len(resPath)+1:])
-                            isChanged = True
-                        logContent.append(' remove item ' + itemName)
-                # Find all item nodes in xml
-                itemItems = root.getElementsByTagName('item')
-                for item in itemItems:
-                    # record the name if the type equals with the resource type
-                    if item.getAttribute('type') == unusedType:
+    for resPath in resPathList:
+        for (parent, _, fileNames) in os.walk(resPath):
+            for fileName in fileNames:
+                # Ignore non xml file
+                if not fileName.endswith('.xml'):
+                    continue
+                isChanged = False
+                # Parser xml file
+                fileFullPath = os.path.join(parent, fileName)
+                dom = xml.dom.minidom.parse(fileFullPath)
+                root = dom.documentElement
+                for (unusedType, unusedList) in unusedDict.items():
+                    # Find all nodes in xml with specific types
+                    dimenItems = root.getElementsByTagName(unusedType)
+                    for item in dimenItems:
                         itemName = item.getAttribute('name')
                         if itemName is not None and itemName in unusedList:
                             root.removeChild(item)
@@ -319,59 +348,72 @@ def removeUnused(resPath, unusedDict):
                                 logContent.append('processing file ' + fileFullPath[len(resPath)+1:])
                                 isChanged = True
                             logContent.append(' remove item ' + itemName)
-            # If the file is changed, we should save it.
-            if isChanged:
-                # Three steps:
-                # 1. save the changed xml to a temp file
-                # 2. format the temp file
-                # 3. rename the temp file to orginal file
-                tempFile = fileFullPath + 'temp'
-                destFile = codecs.open(tempFile, 'w', 'utf-8')
-                dom.writexml(destFile, encoding='utf-8')
-                destFile.close()
-                dom.unlink()
-                replaceNewline(fileFullPath, tempFile)
-                os.remove(fileFullPath)
-                os.rename(tempFile, fileFullPath)
-                logContent.append(' save file')
-            else:
-                dom.unlink()
-            # If the file is empty, remove the file
-            if isEmptyXML(fileFullPath):
-                os.remove(fileFullPath)
-                logContent.append(fileFullPath[len(resPath)+1:] + ' is empty and has been removed')
+                    # Find all item nodes in xml
+                    itemItems = root.getElementsByTagName('item')
+                    for item in itemItems:
+                        # record the name if the type equals with the resource type
+                        if item.getAttribute('type') == unusedType:
+                            itemName = item.getAttribute('name')
+                            if itemName is not None and itemName in unusedList:
+                                root.removeChild(item)
+                                if not isChanged:
+                                    logContent.append('processing file ' + fileFullPath[len(resPath)+1:])
+                                    isChanged = True
+                                logContent.append(' remove item ' + itemName)
+                # If the file is changed, we should save it.
+                if isChanged:
+                    # Three steps:
+                    # 1. save the changed xml to a temp file
+                    # 2. format the temp file
+                    # 3. rename the temp file to orginal file
+                    tempFile = fileFullPath + 'temp'
+                    destFile = codecs.open(tempFile, 'w', 'utf-8')
+                    dom.writexml(destFile, encoding='utf-8')
+                    destFile.close()
+                    dom.unlink()
+                    replaceNewline(fileFullPath, tempFile)
+                    os.remove(fileFullPath)
+                    os.rename(tempFile, fileFullPath)
+                    logContent.append(' save file')
+                else:
+                    dom.unlink()
+                # If the file is empty, remove the file
+                if isEmptyXML(fileFullPath):
+                    os.remove(fileFullPath)
+                    logContent.append(fileFullPath[len(resPath)+1:] + ' is empty and has been removed')
 
 
-def removeUnusedNotInValues(resPath, unusedDict):
+def removeUnusedNotInValues(resPathList, unusedDict):
     for (unusedType, unusedList) in unusedDict.items():
         typedFolders = []
-        (_, folders, _) = os.walk(resPath).next()
-        # find all folders that matched the type
-        for folder in folders:
-            if folder == unusedType or folder.startswith(unusedType + '-'):
-                typedFolders.append(folder)
-        # Iterate through all folders
-        for folder in typedFolders:
-            # Iterate through all files in the folder
-            (parent, _, fileNames) = os.walk(os.path.join(resPath, folder)).next()
-            for fileName in fileNames:
-                # Check whether the file name is valid
-                if unusedType == 'drawable':
-                    isValidFile = isValidDrawableFileName(fileName)
-                else:
-                    isValidFile = isValidResFileName(fileName)
+        for resPath in resPathList:
+            (_, folders, _) = os.walk(resPath).next()
+            # find all folders that matched the type
+            for folder in folders:
+                if folder == unusedType or folder.startswith(unusedType + '-'):
+                    typedFolders.append(folder)
+            # Iterate through all folders
+            for folder in typedFolders:
+                # Iterate through all files in the folder
+                (parent, _, fileNames) = os.walk(os.path.join(resPath, folder)).next()
+                for fileName in fileNames:
+                    # Check whether the file name is valid
+                    if unusedType == 'drawable':
+                        isValidFile = isValidDrawableFileName(fileName)
+                    else:
+                        isValidFile = isValidResFileName(fileName)
 
-                if not isValidFile:
+                    if not isValidFile:
+                            os.remove(os.path.join(parent, fileName))
+                            logContent.append(fileName + ' is invalid ' + unusedType + ', and has been removed')
+                            continue
+                    # Remove the file extension
+                    dotPos = fileName.find('.')
+                    striptFileName = fileName[0:dotPos]
+                    # Remove if the file is unused
+                    if striptFileName in unusedList:
                         os.remove(os.path.join(parent, fileName))
-                        logContent.append(fileName + ' is invalid ' + unusedType + ', and has been removed')
-                        continue
-                # Remove the file extension
-                dotPos = fileName.find('.')
-                striptFileName = fileName[0:dotPos]
-                # Remove if the file is unused
-                if striptFileName in unusedList:
-                    os.remove(os.path.join(parent, fileName))
-                    logContent.append(fileName + ' is unused drawable, and has been removed')
+                        logContent.append(fileName + ' is unused drawable, and has been removed')
 
 
 # minidom have three problems after removeChild and writexml
@@ -532,22 +574,24 @@ def process():
         raise RuntimeError('Unknown project type')
 
     # get the resource folder and source code folder in the project
-    resPath = getResPath(isEclipse, projectDir)
+    resPathList = getResPathList(isEclipse, projectDir)
     srcPathList = getSrcPathList(isEclipse, projectDir)
-    if not os.path.exists(resPath):
-        raise RuntimeError('Cannot find resPath ' + resPath)
+    for resPath in resPathList:
+        if not os.path.exists(resPath):
+            raise RuntimeError('Cannot find resPath ' + resPath)
     for srcPath in srcPathList:
         if not os.path.exists(srcPath):
             raise RuntimeError('Cannot find src path ' + srcPath)
 
     logContent.append('Project dir: ' + projectDir)
-    logContent.append('res dir: ' + resPath)
+    for resPath in resPathList:
+        logContent.append('res dir: ' + resPath)
     for srcPath in srcPathList:
         logContent.append('src dir: ' + srcPath)
     
     # get configed resource
-    resConfigedInValues = getResConfiguredInValues(resPath, ('dimen', 'string', 'color', 'style', 'array', 'string-array', 'integer-array'))
-    resConfigedNotValues = getResConfigedInFiles(resPath, ('drawable', 'layout', 'anim', 'animator'))
+    resConfigedInValues = getResConfiguredInValues(resPathList, ('dimen', 'string', 'color', 'style', 'array', 'string-array', 'integer-array'))
+    resConfigedNotValues = getResConfigedInFiles(resPathList, ('drawable', 'layout', 'anim', 'animator'))
     
     # merge integer-array list and string-array list with array list
     resConfigedInValues['array'] = resConfigedInValues['array'] + resConfigedInValues['string-array'] + resConfigedInValues['integer-array'] 
@@ -555,7 +599,7 @@ def process():
     del resConfigedInValues['integer-array']
     
     # get use resource
-    resUsedDict = getUsedRes(resPath, srcPathList, ('dimen', 'string', 'color', 'style', 'array', 'drawable', 'layout', 'anim', 'animator'))
+    resUsedDict = getUsedRes(resPathList, srcPathList, ('dimen', 'string', 'color', 'style', 'array', 'drawable', 'layout', 'anim', 'animator'))
 
     # get unused resources
     unusedInValuesDict = {}
@@ -576,14 +620,14 @@ def process():
             if len(unusedList) != 0:
                 tempDict[unusedType] = unusedList
         if len(tempDict) != 0:
-            removeUnused(resPath, unusedInValuesDict)
+            removeUnused(resPathList, unusedInValuesDict)
 
         tempDict.clear()
         for (unusedType, unusedList) in unusedNotValuesDict.items():
             if len(unusedList) != 0:
                 tempDict[unusedType] = unusedList
         if len(tempDict) != 0:
-            removeUnusedNotInValues(resPath, unusedNotValuesDict)
+            removeUnusedNotInValues(resPathList, unusedNotValuesDict)
 
 
 def saveToLog():
