@@ -298,7 +298,7 @@ def getUsedRes(resPathList, srcPathList, resTypes):
                 fp.close()
                 for resType in resTypes:
                     resUsedList = resDic[resType]
-                    regex = re.compile(r'[(+,=]\s*R\.%s\.(\S+?)\s*[+),;]' % resType)
+                    regex = re.compile(r'[(+,=.]\s*R\.%s\.(\S+?)\s*[+),;]' % resType)
                     findResults = regex.findall(fileContent)
                     for findItem in findResults:
                         if findItem != '':
