@@ -1,7 +1,7 @@
 # AndroidResCleaner
 
 ## Description
-As an Android developer, we must be familiar with the Android res folder in the project. In the development process, many kinds of resources are added into this folder. drawables, layouts, anims, animators etc. are added as independent files, other resources such as styles, strings, styles are added in xml files. With the development of the project, some resources may become deprecated and useless. These resources should be removed from the project, but somehow we may be forget to to this. One day, we may want to do something to make our project more cleaner and more smaller. But you will soon find that it's a truly tiresome and time-consuming work to identify and remove these useless resources.
+As Android developers, we must be familiar with the Android res folder in the project. During development, many kinds of resources are added into this folder. drawables, layouts, anims, animators etc. are added as independent files, other resources such as styles, strings, styles are added in xml files. With the development of the project, some resources may become deprecated and useless. These resources should be removed from the project, but somehow we may be forget to to this. One day, we may want to do something to make our project more cleaner and more smaller. But you will soon find that it's a truly tiresome and time-consuming work to identify and remove these useless resources.
 This AndroidResCleaner tool can finish this work in a few seconds. It can find various useless resources and help you to remove them from your project.
 
 ## Features
