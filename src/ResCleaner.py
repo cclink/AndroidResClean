@@ -9,7 +9,7 @@ import re
 from exceptions import RuntimeError
 import time
 
-
+RClassName = 'NewR'
 # Check whether the drawable file name is valid
 def isValidDrawableFileName(fileName):
     # The extension of drawable file must be png, xml or jpg.
@@ -298,11 +298,38 @@ def getUsedRes(resPathList, srcPathList, resTypes):
                 fp.close()
                 for resType in resTypes:
                     resUsedList = resDic[resType]
-                    regex = re.compile(r'[(+,=.?:]\s*R\.%s\.(\S+?)\s*[+),;:]' % resType)
+                    # 匹配代码中对资源的引用
+                    # 前面是+,=.?:中的任意一个，中间是R类名.资源类型.资源名，后面以+),;:结尾
+                    # 将R类名和类型带入以及去掉空格等约束后得到：[(+,=.?:]R.layout.(\S+?)[+),;:]
+                    regex = re.compile(r'[(+,=.?:]\s*%s\.%s\.(\S+?)\s*[+),;:]' % (RClassName, resType))
                     findResults = regex.findall(fileContent)
                     for findItem in findResults:
                         if findItem != '':
                             resUsedList.append(findItem)
+                    # 解决问号表达式的匹配问题，在做r'[(+,=.?:]\s*R\.%s\.(\S+?)\s*[+),;:]' % resType的匹配的时候，
+                    # 如果恰好问号表达式前后都是同一个资源类型，则只能匹配到第一个，这是因为第一个匹配的时候会用掉
+                    # 问号表达式中的 : ，这导致第二个匹配的时候无法匹配成功，这里需要重新对第二个资源进行匹配
+                    # 例如：int layoutId = haveImage ? R.layout.layout_with_image : R.layout.layout_no_image;
+                    # 将R类名和类型带入以及去掉空格等约束后得到：? R.layout.\S+ : R.layout.(\S+?)[+),;:]
+                    regex = re.compile(r'\?\s*%s\.%s\.\S+\s*:\s*%s\.%s\.(\S+?)\s*[+),;:]' % (RClassName, resType, RClassName, resType))
+                    findResults = regex.findall(fileContent)
+                    for findItem in findResults:
+                        if findItem != '':
+                            resUsedList.append(findItem)
+                    # 对数组的匹配，例如：new int[]{R.drawable.indicator1, R.drawable.indicator2}
+                    # 先将所有的new int[]{}形式的数组中的内容匹配出来，然后按照逗号分割，最后再匹配资源
+                    # 去掉空格等约束和转义后得到：new int[] {(.+)}
+                    regex = re.compile(r'new\s+int\s*\[\s*\]\s*\{(.+)\}')
+                    findResults = regex.findall(fileContent)
+                    for findItem in findResults:
+                        itemList = findItem.split(',')
+                        for arrayItem in itemList:
+                            # 用来匹配R.xx.xxx的xxx，正则很简单，就不解释了
+                            arrayRegex = re.compile(r'%s\.%s\.(\S+)' % (RClassName, resType))
+                            arrayFindResults = arrayRegex.findall(arrayItem)
+                            for arrayFindItem in arrayFindResults:
+                                if arrayFindItem != '':
+                                    resUsedList.append(arrayFindItem)
     return resDic
 
 
